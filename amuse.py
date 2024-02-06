@@ -33,6 +33,15 @@ def generateAuth(id, format, section = 0):
     hash = hashlib.md5(bytearray(s, "utf-8"))
     return hash.hexdigest()[0:4]
 
+def chooseName(name):
+    default = name
+    nl()
+    info(f"Default name : {default}")
+    info("Do you want to change ? (press enter to continue without changing)")
+    change = input(" > ").strip()
+    nl()
+    return change if len(change) > 0 else default
+
 def getDefaultFolderPath(name):
     return os.getcwd() + "/" + name
 
@@ -96,6 +105,8 @@ def main():
     page = sess.get(url).text
     name = re.search(SONG_REGEX, page)[1]
     pages = int(re.search(PAGES_REGEX, page)[1])
+
+    name = chooseName(name)
 
     positive("Processing " + name + f" (id : {id})")
     info(str(pages) + " pages to download...")
