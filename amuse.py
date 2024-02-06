@@ -58,7 +58,7 @@ def downloadPart(sess, id, format, folder, name, section = 0):
     download_url = res["info"]["url"]
     ext = EXTS[format]
     section_annotation = "" if section == 0 else f"-{section}"
-    filepath = f"{folder}/{name}-{format}{section_annotation}.{ext}"
+    filepath = f"{folder}/{name}{section_annotation}.{ext}"
     urlretrieve(download_url, filepath)
     return filepath
 
