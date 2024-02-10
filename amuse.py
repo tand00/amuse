@@ -14,6 +14,8 @@ API_GET_LINK = "https://musescore.com/api/jmuse"
 
 PAGES_REGEX = r'pages(?:&quot;|"):(\d+)'
 SONG_REGEX = r'property="og:title" content="([^"]+)"'
+SCRIPTS_REGEX = r'<link href="([^"]+)" rel="preload" as="script">'
+ENCODING_SEED_REGEX = r'\+"([^"]+)"\)\.substr\(0,4\)'
 
 EXTS = {
     "mp3" : "mp3",
@@ -28,18 +30,25 @@ progress = lambda x: print(" [.]", x)
 negative = lambda x: print(" [-]", x)
 positive = lambda x: print(" [+]", x)
 
-def generateAuth(id, format, section = 0):
-    s = str(id) + format + str(section) + ")82"
+def fetchEncryptionKey(page):
+    scripts = re.findall(SCRIPTS_REGEX, page)
+    for script in scripts:
+        content = requests.get(script).text
+        key_match = re.search(ENCODING_SEED_REGEX, content)
+        if key_match is None:
+            continue
+        return key_match[1]
+
+def generateAuth(id, format, section = 0, seed = "8(a("):
+    s = str(id) + format + str(section) + seed
     hash = hashlib.md5(bytearray(s, "utf-8"))
     return hash.hexdigest()[0:4]
 
 def chooseName(name):
     default = name
-    nl()
     info(f"Default name : {default}")
     info("Do you want to change ? (press enter to continue without changing)")
     change = input(" > ").strip()
-    nl()
     return change if len(change) > 0 else default
 
 def getDefaultFolderPath(name):
@@ -47,11 +56,9 @@ def getDefaultFolderPath(name):
 
 def chooseFolder(name):
     default = getDefaultFolderPath(name)
-    nl()
     info(f"Default output folder : {default}")
     info("Do you want to change ? (press enter to continue without changing)")
     change = input(" > ").strip()
-    nl()
     return change if len(change) > 0 else default
 
 def ensureFolderExists(name):
@@ -59,8 +66,8 @@ def ensureFolderExists(name):
         return
     os.mkdir(name)
 
-def downloadPart(sess, id, format, folder, name, section = 0):
-    auth = generateAuth(id, format, section)
+def downloadPart(sess, id, format, folder, name, section = 0, seed = "8(a("):
+    auth = generateAuth(id, format, section, seed)
     headers = {"Authorization": auth}
     params = {"id": id, "index": section, "type": format}
     res = sess.get(API_GET_LINK, params = params, headers = headers).json()
@@ -91,7 +98,8 @@ def quit():
 
 def main():
     nl()
-    info("Ready to rock !\n")
+    info("Ready to rock !")
+    nl()
 
     info("Musescore URL : ")
     url = input(" > ").strip()
@@ -106,26 +114,34 @@ def main():
     name = re.search(SONG_REGEX, page)[1]
     pages = int(re.search(PAGES_REGEX, page)[1])
 
+    nl()
     name = chooseName(name)
+    folder = chooseFolder(name)
+    ensureFolderExists(folder)
+    nl()
 
     positive("Processing " + name + f" (id : {id})")
     info(str(pages) + " pages to download...")
 
-    folder = chooseFolder(name)
-    ensureFolderExists(folder)
+    progress("Looking for encryption key...")
+    seed = fetchEncryptionKey(page)
+    if seed is None:
+        warning("Did not find encryption key !")
+        return
+    positive("Found encryption key : " + seed)
 
     progress("Downloading MP3...")
-    downloadPart(sess, id, "mp3", folder, name)
+    downloadPart(sess, id, "mp3", folder, name, seed = seed)
     positive("Downloaded MP3 !")
 
     progress("Downloading MIDI...")
-    downloadPart(sess, id, "midi", folder, name)
+    downloadPart(sess, id, "midi", folder, name, seed = seed)
     positive("Downloaded MIDI !")
 
     progress("Downloading images...")
     images = []
     for section in range(pages):
-        f = downloadPart(sess, id, "img", folder, name, section)
+        f = downloadPart(sess, id, "img", folder, name, section, seed = seed)
         images.append(f)
     positive("Downloaded images !")
 
