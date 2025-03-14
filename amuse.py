@@ -9,13 +9,14 @@ import tempfile
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPDF
 from pypdf import PdfWriter
+import time
 
 API_GET_LINK = "https://musescore.com/api/jmuse"
 
 PAGES_REGEX = r'pages(?:&quot;|"):(\d+)'
 SONG_REGEX = r'property="og:title" content="([^"]+)"'
-SCRIPTS_REGEX = r'<link href="([^"]+)" rel="preload" as="script">'
-ENCODING_SEED_REGEX = r'\+"([^"]+)"\)\.substr\(0,4\)'
+SCRIPTS_REGEX = r"<link\s*rel='preload'\s*href='([^']+\.js)"
+ENCODING_SEED_REGEX = r'\+\s*"([^"]+)"\)\.substr\(0,\s*4\)'
 
 EXTS = {
     "mp3" : "mp3",
@@ -32,8 +33,9 @@ positive = lambda x: print(" [+]", x)
 
 def fetchEncryptionKey(page):
     scripts = re.findall(SCRIPTS_REGEX, page)
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
     for script in scripts:
-        content = requests.get(script).text
+        content = requests.get(script, headers = headers).text
         key_match = re.search(ENCODING_SEED_REGEX, content)
         if key_match is None:
             continue
